@@ -17,13 +17,19 @@ class TestWidget extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'In Isolate: ' +
-                result.anotherThreadExecutionTime.inMilliseconds.toString() +
+                result.isolateExecutionTime.inMilliseconds.toString() +
                 ' milliseconds',
           ),
           const SizedBox(height: 2),
           Text(
             'In Main thread: ' +
                 result.mainThreadExecutionTime.inMilliseconds.toString() +
+                ' milliseconds',
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'In Compute: ' +
+                result.computeExecutionTime.inMilliseconds.toString() +
                 ' milliseconds',
           ),
         ],

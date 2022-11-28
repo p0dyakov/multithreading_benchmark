@@ -1,5 +1,6 @@
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,13 +8,15 @@ enum TestType { createNumbersArray, calculateFactorial }
 
 class TestResult {
   final Duration mainThreadExecutionTime;
-  final Duration anotherThreadExecutionTime;
+  final Duration isolateExecutionTime;
+  final Duration computeExecutionTime;
   final TestType testType;
 
   TestResult({
     required this.testType,
+    required this.computeExecutionTime,
     required this.mainThreadExecutionTime,
-    required this.anotherThreadExecutionTime,
+    required this.isolateExecutionTime,
   });
 }
 
@@ -27,33 +30,40 @@ class TestsController extends ChangeNotifier {
     isTestRunning = true;
     notifyListeners();
 
-    late final Future<void> Function() test;
+    late final Future<void> Function(int number) test;
+    late final int testNumber;
 
     switch (testType) {
       case TestType.createNumbersArray:
-        test = () => createNumbersArray(10000);
+        test = createNumbersArray;
+        testNumber = 10000;
         break;
       case TestType.calculateFactorial:
-        test = () => calculateFactorial(50);
+        test = calculateFactorial;
+        testNumber = 50;
         break;
     }
 
-    final anotherThreadExecutionTime = await measureExecutionTime(
-      () => workInBackground(
+    final isolateExecutionTime = await measureExecutionTime(
+      () => workInIsolate(
         (port) async {
-          await test();
+          await test(testNumber);
           Isolate.exit(port, 'canceled');
         },
       ),
     );
     final mainThreadExecutionTime = await measureExecutionTime(() async {
-      await test();
+      await test(testNumber);
+    });
+    final computeExecutionTime = await measureExecutionTime(() async {
+      await compute<int, void>(test, testNumber);
     });
 
     isTestRunning = false;
     results.add(
       TestResult(
-        anotherThreadExecutionTime: anotherThreadExecutionTime,
+        computeExecutionTime: computeExecutionTime,
+        isolateExecutionTime: isolateExecutionTime,
         mainThreadExecutionTime: mainThreadExecutionTime,
         testType: TestType.createNumbersArray,
       ),
@@ -77,7 +87,7 @@ Future<Duration> measureExecutionTime(
   return stopwatch.elapsed;
 }
 
-Future<void> workInBackground(void Function(SendPort) test) async {
+Future<void> workInIsolate(void Function(SendPort) test) async {
   final port = ReceivePort('test');
   await Isolate.spawn(test, port.sendPort);
   await port.first;
